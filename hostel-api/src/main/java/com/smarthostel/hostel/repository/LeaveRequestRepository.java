@@ -1,0 +1,10 @@
+package com.smarthostel.hostel.repository;
+
+import com.smarthostel.hostel.entity.LeaveRequest;
+import org.springframework.data.jpa.repository.JpaRepository;
+import java.util.List;
+
+public interface LeaveRequestRepository extends JpaRepository<LeaveRequest, Long> {
+	List<LeaveRequest> findByStudentId(Long studentId);
+	List<LeaveRequest> findByStatus(String status);
+}

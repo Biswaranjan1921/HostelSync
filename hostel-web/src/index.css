@@ -1,0 +1,86 @@
+:root {
+  --bg: #030611;
+  --surface: #0a0f26;
+  --surface-hover: #121a3d;
+  --border: #162447;
+  --text: #e2e8f0;
+  --text-muted: #64748b;
+  --accent: #3b82f6;      /* Vivid Blue */
+  --accent-dim: #1d4ed8;  /* Deep Navy Blue */
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --radius: 12px;
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --glass-bg: rgba(10, 15, 38, 0.75);
+  --glass-border: rgba(59, 130, 246, 0.2);
+  --neon-shadow: 0 0 15px rgba(59, 130, 246, 0.4);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input, select, textarea {
+  font-family: inherit;
+}
+
+/* Custom glassmorphism and glow utility classes */
+.glass-card {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.4) !important;
+}
+
+.glow-hover:hover {
+  box-shadow: var(--neon-shadow);
+  border-color: var(--accent) !important;
+}
+
+/* Dark mode custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent-dim);
+}

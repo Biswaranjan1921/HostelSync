@@ -1,0 +1,28 @@
+# Node dependencies
+node_modules/
+dist/
+.eslintcache
+
+# Maven target
+target/
+*.class
+*.jar
+*.war
+*.ear
+
+# IDE files
+.idea/
+*.iml
+.vscode/
+.project
+.classpath
+.settings/
+
+# Local databases & logs
+data/
+*.log
+.data/
+
+# OS files
+Thumbs.db
+.DS_Store
