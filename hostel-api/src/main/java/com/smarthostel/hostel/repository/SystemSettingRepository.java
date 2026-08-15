@@ -1,7 +1,0 @@
-package com.smarthostel.hostel.repository;
-
-import com.smarthostel.hostel.entity.SystemSetting;
-import org.springframework.data.jpa.repository.JpaRepository;
-
-public interface SystemSettingRepository extends JpaRepository<SystemSetting, String> {
-}

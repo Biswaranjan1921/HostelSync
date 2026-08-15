@@ -1,0 +1,106 @@
+:root {
+  --bg: #0c120e;
+  --surface: #141f17;
+  --surface-hover: #1c2b20;
+  --border: #283c2e;
+  --text: #ffffff;
+  --text-muted: #9fb3a3;
+  --accent: #A4B885;      /* User's primary requested #A4B885 */
+  --accent-dim: #7d945a;  /* Rich Sage Olive */
+  --accent-light: #c2d4a7;
+  --accent-neon: #b4cc91;
+  --warning: #f59e0b;
+  --danger: #ef4444;
+  --radius: 12px;
+  --font-sans: 'Inter', system-ui, -apple-system, BlinkMacSystemFont, sans-serif;
+  --font-mono: 'JetBrains Mono', monospace;
+  --glass-bg: rgba(20, 31, 23, 0.90);
+  --glass-border: rgba(164, 184, 133, 0.35);
+  --neon-shadow: 0 0 20px rgba(164, 184, 133, 0.4);
+}
+
+[data-theme="light"] {
+  --bg: #E8F5E9;         /* Light Mint background */
+  --surface: #ffffff;
+  --surface-hover: #dcf0de;
+  --border: #c3e2c6;
+  --text: #111d13;
+  --text-muted: #4e6955;
+  --accent: #5e783c;      /* Rich contrast tone of #A4B885 for light mode buttons & headings */
+  --accent-dim: #455a29;
+  --accent-light: #A4B885;
+  --accent-neon: #059669;
+  --warning: #d97706;
+  --danger: #dc2626;
+  --glass-bg: rgba(255, 255, 255, 0.94);
+  --glass-border: rgba(164, 184, 133, 0.4);
+  --neon-shadow: 0 4px 15px rgba(164, 184, 133, 0.3);
+}
+
+* {
+  box-sizing: border-box;
+}
+
+body {
+  margin: 0;
+  font-family: var(--font-sans);
+  background: var(--bg);
+  color: var(--text);
+  min-height: 100vh;
+  line-height: 1.5;
+}
+
+#root {
+  min-height: 100vh;
+}
+
+a {
+  color: var(--accent);
+  text-decoration: none;
+}
+
+a:hover {
+  text-decoration: underline;
+}
+
+button {
+  font-family: inherit;
+  cursor: pointer;
+}
+
+input, select, textarea {
+  font-family: inherit;
+}
+
+/* Custom glassmorphism and glow utility classes */
+.glass-card {
+  background: var(--glass-bg) !important;
+  backdrop-filter: blur(16px);
+  -webkit-backdrop-filter: blur(16px);
+  border: 1px solid var(--glass-border) !important;
+  box-shadow: 0 8px 32px 0 rgba(0, 0, 0, 0.45) !important;
+}
+
+.glow-hover:hover {
+  box-shadow: var(--neon-shadow);
+  border-color: var(--accent) !important;
+}
+
+/* Dark mode custom scrollbar */
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: var(--bg);
+}
+
+::-webkit-scrollbar-thumb {
+  background: var(--border);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: var(--accent);
+}

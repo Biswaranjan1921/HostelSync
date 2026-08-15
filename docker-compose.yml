@@ -1,0 +1,22 @@
+version: '3.8'
+
+services:
+  backend:
+    build:
+      context: ./backend
+      dockerfile: Dockerfile
+    container_name: hostelsync-backend
+    ports:
+      - "8085:8085"
+    restart: always
+
+  frontend:
+    build:
+      context: ./frontend
+      dockerfile: Dockerfile
+    container_name: hostelsync-frontend
+    ports:
+      - "5173:80"
+    depends_on:
+      - backend
+    restart: always

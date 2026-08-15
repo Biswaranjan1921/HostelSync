@@ -1,0 +1,54 @@
+spring:
+  application:
+    name: hostel-api
+  datasource:
+    url: jdbc:h2:file:./data/smarthostel;DB_CLOSE_DELAY=-1;DB_CLOSE_ON_EXIT=FALSE
+    driver-class-name: org.h2.Driver
+    username: ${DB_USER:sa}
+    password: ${DB_PASS:}
+  h2:
+    console:
+      enabled: true
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+    properties:
+      hibernate:
+        format_sql: true
+    open-in-view: false
+  security:
+    oauth2:
+      client:
+        registration:
+          google:
+            client-id: ${GOOGLE_CLIENT_ID:YOUR_GOOGLE_CLIENT_ID}
+            client-secret: ${GOOGLE_CLIENT_SECRET:YOUR_GOOGLE_CLIENT_SECRET}
+            scope: email, profile
+  mail:
+    host: smtp.gmail.com
+    port: 587
+    username: ${SMTP_USER:your-email@gmail.com}
+    password: ${SMTP_PASS:your-app-password}
+    properties:
+      mail:
+        smtp:
+          auth: true
+          starttls:
+            enable: true
+server:
+  port: 8085
+  tomcat:
+    threads:
+      max: 800
+      min-spare: 50
+    max-connections: 4000
+    accept-count: 800
+
+app:
+  cors-allowed-origins: "http://localhost:5173,http://localhost:5174,http://localhost:3000"
+  default-superadmin-pass: "9861944502@SA"
+  default-admin-pass: "admin123"
+  jwt:
+    secret: "9a4f2c8d3b7a1e6f45c8a0b3f267d8b1d4e6f3c8a9d2b5f8e3a9c8b5f6e8a3d9"
+    expiration-ms: 86400000
