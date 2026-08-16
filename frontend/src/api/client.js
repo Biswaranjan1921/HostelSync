@@ -102,6 +102,7 @@ export const api = {
     list: () => request('/leaves'),
     create: (body) => request('/leaves', { method: 'POST', body: JSON.stringify(body) }),
     updateStatus: (id, status) => request(`/leaves/${id}/status?status=${status}`, { method: 'PUT' }),
+    verifyGatePass: (body) => request('/leaves/verify-gatepass', { method: 'POST', body: JSON.stringify(body) }),
   },
   complaints: {
     list: () => request('/complaints'),

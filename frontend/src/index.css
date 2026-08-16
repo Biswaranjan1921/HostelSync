@@ -104,3 +104,9 @@ input, select, textarea {
 ::-webkit-scrollbar-thumb:hover {
   background: var(--accent);
 }
+
+@keyframes phonePeLaser {
+  0% { top: 5%; opacity: 0.2; }
+  50% { top: 90%; opacity: 1; }
+  100% { top: 5%; opacity: 0.2; }
+}

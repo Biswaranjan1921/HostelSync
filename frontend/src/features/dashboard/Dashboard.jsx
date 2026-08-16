@@ -15,6 +15,7 @@ export default function Dashboard() {
   const [stats, setStats] = useState(null);
   const [recent, setRecent] = useState([]);
   const [qrBase64, setQrBase64] = useState('');
+  const [showBigQrModal, setShowBigQrModal] = useState(false);
   const [studentInfo, setStudentInfo] = useState(null);
   const [notices, setNotices] = useState([]);
   const [loading, setLoading] = useState(true);
@@ -746,18 +747,57 @@ export default function Dashboard() {
               Scan at the mess counter or gate for access logs. Generated dynamically for today.
             </p>
             {qrBase64 ? (
-              <div style={styles.qrContainer}>
-                <img
-                  src={`data:image/png;base64,${qrBase64}`}
-                  alt="My QR Code"
-                  style={styles.qrImage}
-                />
-                <div style={styles.tokenText}>{studentInfo?.qrToken}</div>
+              <div 
+                style={styles.phonePeCard}
+                onClick={() => setShowBigQrModal(true)}
+                title="Click to Enlarge PhonePe Pass"
+              >
+                <div style={styles.phonePeHeader}>
+                  <img src="/logo.jpg" alt="Logo" style={{ width: 22, height: 22, borderRadius: '4px' }} />
+                  <span>HostelSync Official Pass</span>
+                </div>
+                <div style={styles.phonePeQrWrap}>
+                  <img
+                    src={`data:image/png;base64,${qrBase64}`}
+                    alt="My QR Code"
+                    style={styles.phonePeQrImg}
+                  />
+                </div>
+                <div style={styles.phonePeStudentName}>{studentInfo?.name || 'STUDENT PASS'}</div>
+                <div style={styles.phonePeTokenText}>{studentInfo?.qrToken}</div>
+                <div style={styles.phonePeEnlargeBadge}>🔍 Tap to Expand QR Code</div>
               </div>
             ) : (
               <p style={styles.muted}>Generating QR code...</p>
             )}
           </div>
+
+          {/* Full Screen Big PhonePe QR Modal */}
+          {showBigQrModal && qrBase64 && (
+            <div style={styles.modalOverlay} onClick={() => setShowBigQrModal(false)}>
+              <div style={styles.phonePeModalBody} onClick={(e) => e.stopPropagation()}>
+                <div style={styles.phonePeModalHeader}>
+                  <div style={{ display: 'flex', alignItems: 'center', gap: '8px' }}>
+                    <img src="/logo.jpg" alt="Logo" style={{ width: 28, height: 28, borderRadius: '6px' }} />
+                    <span style={{ fontWeight: 700, fontSize: '1.1rem', color: '#0c120e' }}>HostelSync Dining Pass</span>
+                  </div>
+                  <button onClick={() => setShowBigQrModal(false)} style={styles.phonePeCloseBtn}>✕</button>
+                </div>
+                <div style={styles.phonePeModalQrWrap}>
+                  <img
+                    src={`data:image/png;base64,${qrBase64}`}
+                    alt="Enlarged PhonePe QR"
+                    style={styles.phonePeBigQrImg}
+                  />
+                </div>
+                <div style={styles.phonePeModalMeta}>
+                  <h3 style={{ margin: '0 0 0.25rem 0', color: '#0c120e', fontSize: '1.25rem' }}>{studentInfo?.name}</h3>
+                  <div style={{ fontSize: '0.9rem', color: '#4a5568', fontWeight: 600 }}>Token: {studentInfo?.qrToken}</div>
+                  <div style={{ fontSize: '0.85rem', color: '#718096', marginTop: '0.25rem' }}>Show this QR code clearly to the scanner terminal</div>
+                </div>
+              </div>
+            </div>
+          )}
 
           {/* Quick Actions & Room Info */}
           <div style={styles.card} className="glass-card">
@@ -794,6 +834,87 @@ export default function Dashboard() {
             )}
           </div>
         </div>
+
+        {/* Today's Dining Access Tracker */}
+        {(() => {
+          const todayIso = new Date().toISOString().split('T')[0];
+          const bkRecord = recent.find(m => m.mealSlot === 'BREAKFAST' && String(m.verificationDate || m.verifiedAt).startsWith(todayIso));
+          const lcRecord = recent.find(m => m.mealSlot === 'LUNCH' && String(m.verificationDate || m.verifiedAt).startsWith(todayIso));
+          const dnRecord = recent.find(m => m.mealSlot === 'DINNER' && String(m.verificationDate || m.verifiedAt).startsWith(todayIso));
+
+          return (
+            <div style={styles.mealTrackerContainer} className="glass-card">
+              <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', marginBottom: '1rem' }}>
+                <h3 style={{ margin: 0, fontSize: '1.1rem', fontWeight: 700, display: 'flex', alignItems: 'center', gap: '0.5rem' }}>
+                  🍽️ Today's Dining Access Status
+                </h3>
+                <span style={{ fontSize: '0.8rem', color: 'var(--text-muted)' }}>1 Scan Permitted Per Meal Slot</span>
+              </div>
+
+              <div style={styles.mealSlotGrid}>
+                {/* Breakfast */}
+                <div style={{
+                  ...styles.mealSlotCard,
+                  ...(bkRecord ? styles.mealSlotFaded : styles.mealSlotActive)
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>🌅 Breakfast</span>
+                    <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>8:00 AM - 10:00 AM</span>
+                  </div>
+                  {bkRecord ? (
+                    <div style={styles.mealClaimedBadge}>
+                      ✓ COMPLETED (Taken at {new Date(bkRecord.verifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                    </div>
+                  ) : (
+                    <div style={styles.mealPendingBadge}>
+                      ● Ready for Scan
+                    </div>
+                  )}
+                </div>
+
+                {/* Lunch */}
+                <div style={{
+                  ...styles.mealSlotCard,
+                  ...(lcRecord ? styles.mealSlotFaded : styles.mealSlotActive)
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>☀️ Lunch</span>
+                    <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>11:30 AM - 2:00 PM</span>
+                  </div>
+                  {lcRecord ? (
+                    <div style={styles.mealClaimedBadge}>
+                      ✓ COMPLETED (Taken at {new Date(lcRecord.verifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                    </div>
+                  ) : (
+                    <div style={styles.mealPendingBadge}>
+                      ● Ready for Scan
+                    </div>
+                  )}
+                </div>
+
+                {/* Dinner */}
+                <div style={{
+                  ...styles.mealSlotCard,
+                  ...(dnRecord ? styles.mealSlotFaded : styles.mealSlotActive)
+                }}>
+                  <div style={{ display: 'flex', justifyContent: 'space-between', alignItems: 'center' }}>
+                    <span style={{ fontWeight: 700, fontSize: '0.95rem' }}>🌙 Dinner</span>
+                    <span style={{ fontSize: '0.75rem', opacity: 0.8 }}>8:00 PM - 10:00 PM</span>
+                  </div>
+                  {dnRecord ? (
+                    <div style={styles.mealClaimedBadge}>
+                      ✓ COMPLETED (Taken at {new Date(dnRecord.verifiedAt).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit' })})
+                    </div>
+                  ) : (
+                    <div style={styles.mealPendingBadge}>
+                      ● Ready for Scan
+                    </div>
+                  )}
+                </div>
+              </div>
+            </div>
+          );
+        })()}
 
         <div style={styles.studentGrid}>
           {/* Quick Actions */}
@@ -1054,20 +1175,147 @@ const styles = {
     flexDirection: 'column',
     background: 'linear-gradient(135deg, var(--surface) 0%, rgba(59, 130, 246, 0.04) 100%)',
   },
-  cardTitle: { margin: '0 0 0.5rem 0', fontSize: '1.1rem', fontWeight: 600 },
-  cardDesc: { margin: '0 0 1.25rem 0', fontSize: '0.8rem', color: 'var(--text-muted)', lineHeight: '1.5' },
-  
-  qrContainer: {
+  mealTrackerContainer: {
+    border: '1px solid var(--border)',
+    borderRadius: 'var(--radius)',
+    padding: '1.25rem 1.5rem',
+    background: 'var(--surface)',
+    marginBottom: '1.5rem',
+  },
+  mealSlotGrid: {
+    display: 'grid',
+    gridTemplateColumns: 'repeat(auto-fit, minmax(260px, 1fr))',
+    gap: '1rem',
+  },
+  mealSlotCard: {
+    padding: '1rem 1.25rem',
+    borderRadius: '12px',
+    border: '1px solid var(--border)',
+    background: 'var(--bg)',
+    display: 'flex',
+    flexDirection: 'column',
+    gap: '0.5rem',
+    transition: 'all 0.3s ease',
+  },
+  mealSlotActive: {
+    border: '1px solid var(--accent)',
+    boxShadow: '0 4px 14px rgba(164, 184, 133, 0.15)',
+  },
+  mealSlotFaded: {
+    opacity: 0.55,
+    filter: 'grayscale(60%)',
+    background: 'rgba(34, 197, 94, 0.05)',
+    border: '1px solid rgba(34, 197, 94, 0.3)',
+  },
+  mealClaimedBadge: {
+    fontSize: '0.8rem',
+    fontWeight: 700,
+    color: '#22c55e',
+    background: 'rgba(34, 197, 94, 0.15)',
+    padding: '0.4rem 0.75rem',
+    borderRadius: '6px',
+    textAlign: 'center',
+  },
+  mealPendingBadge: {
+    fontSize: '0.8rem',
+    fontWeight: 600,
+    color: 'var(--accent)',
+    background: 'rgba(164, 184, 133, 0.12)',
+    padding: '0.4rem 0.75rem',
+    borderRadius: '6px',
+    textAlign: 'center',
+  },
+
+  phonePeCard: {
     display: 'flex',
     flexDirection: 'column',
     alignItems: 'center',
-    justifyContent: 'center',
-    background: '#fff',
+    background: '#FFFFFF',
     padding: '1.25rem',
-    borderRadius: '8px',
+    borderRadius: '16px',
     margin: 'auto',
-    width: 'fit-content',
+    width: '100%',
+    maxWidth: '260px',
+    boxShadow: '0 12px 32px rgba(0, 0, 0, 0.25)',
+    border: '2px solid #A4B885',
+    cursor: 'pointer',
+    transition: 'transform 0.2s ease',
   },
+  phonePeHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    gap: '6px',
+    fontSize: '0.8rem',
+    fontWeight: 700,
+    color: '#0c120e',
+    marginBottom: '0.75rem',
+  },
+  phonePeQrWrap: {
+    background: '#FFFFFF',
+    padding: '8px',
+    borderRadius: '12px',
+    border: '1px solid #e2e8f0',
+  },
+  phonePeQrImg: { width: 190, height: 190, objectFit: 'contain' },
+  phonePeStudentName: {
+    marginTop: '0.5rem',
+    color: '#0c120e',
+    fontWeight: 700,
+    fontSize: '1rem',
+  },
+  phonePeTokenText: {
+    marginTop: '0.2rem',
+    color: '#4a5568',
+    fontFamily: 'var(--font-mono)',
+    fontSize: '0.8rem',
+    fontWeight: 600,
+    letterSpacing: '1px',
+  },
+  phonePeEnlargeBadge: {
+    marginTop: '0.75rem',
+    background: '#224248',
+    color: '#A4B885',
+    fontSize: '0.75rem',
+    fontWeight: 600,
+    padding: '0.35rem 0.75rem',
+    borderRadius: '999px',
+  },
+  phonePeModalBody: {
+    background: '#FFFFFF',
+    padding: '2rem',
+    borderRadius: '24px',
+    width: '90%',
+    maxWidth: '380px',
+    textAlign: 'center',
+    boxShadow: '0 25px 50px -12px rgba(0,0,0,0.5)',
+    border: '3px solid #A4B885',
+  },
+  phonePeModalHeader: {
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: '1.25rem',
+  },
+  phonePeCloseBtn: {
+    background: '#edf2f7',
+    border: 'none',
+    width: '32px',
+    height: '32px',
+    borderRadius: '50%',
+    fontWeight: 'bold',
+    cursor: 'pointer',
+    color: '#2d3748',
+  },
+  phonePeModalQrWrap: {
+    background: '#FFFFFF',
+    padding: '1rem',
+    borderRadius: '16px',
+    border: '2px solid #cbd5e0',
+    display: 'inline-block',
+    margin: '0 auto 1.25rem auto',
+  },
+  phonePeBigQrImg: { width: 280, height: 280, display: 'block' },
+  phonePeModalMeta: { textAlign: 'center' },
   qrImage: { width: 140, height: 140 },
   tokenText: {
     marginTop: '0.5rem',

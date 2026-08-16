@@ -21,10 +21,13 @@ public class LeaveRequestController {
 	private final UserRepository userRepository;
 	private final com.smarthostel.hostel.student.StudentRepository studentRepository;
 
-	public LeaveRequestController(LeaveRequestService leaveRequestService, UserRepository userRepository, com.smarthostel.hostel.student.StudentRepository studentRepository) {
+	private final com.smarthostel.hostel.room.RoomRepository roomRepository;
+
+	public LeaveRequestController(LeaveRequestService leaveRequestService, UserRepository userRepository, com.smarthostel.hostel.student.StudentRepository studentRepository, com.smarthostel.hostel.room.RoomRepository roomRepository) {
 		this.leaveRequestService = leaveRequestService;
 		this.userRepository = userRepository;
 		this.studentRepository = studentRepository;
+		this.roomRepository = roomRepository;
 	}
 
 	@GetMapping
@@ -101,5 +104,16 @@ public class LeaveRequestController {
 		return leaveRequestService.updateStatus(id, status)
 				.map(ResponseEntity::ok)
 				.orElse(ResponseEntity.notFound().build());
+	}
+
+	@PostMapping("/verify-gatepass")
+	public ResponseEntity<?> verifyGatePass(HttpServletRequest request, @RequestBody java.util.Map<String, String> body) {
+		String role = (String) request.getAttribute("userRole");
+		if (role == null) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Session expired.");
+		}
+		String payload = body != null ? body.get("qrPayload") : null;
+		java.util.Map<String, Object> result = leaveRequestService.verifyGatePass(payload, studentRepository, roomRepository);
+		return ResponseEntity.ok(result);
 	}
 }

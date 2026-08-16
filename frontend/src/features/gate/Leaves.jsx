@@ -9,6 +9,7 @@ export default function Leaves() {
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState('');
   const [success, setSuccess] = useState('');
+  const [selectedGatePass, setSelectedGatePass] = useState(null);
 
   const user = JSON.parse(localStorage.getItem('user') || '{}');
   const isStudent = user.role === 'STUDENT';
@@ -185,12 +186,65 @@ export default function Leaves() {
                       </button>
                     </div>
                   )}
+
+                  {leave.status === 'APPROVED' && (
+                    <div style={{ marginTop: '0.75rem' }}>
+                      <button
+                        onClick={() => setSelectedGatePass(leave)}
+                        style={styles.gatePassBtn}
+                      >
+                        🎟️ View Approved Gate Pass QR
+                      </button>
+                    </div>
+                  )}
                 </div>
               ))
             )}
           </div>
         </div>
       </div>
+
+      {/* Gate Pass Modal */}
+      {selectedGatePass && (
+        <div style={styles.modalOverlay} onClick={() => setSelectedGatePass(null)}>
+          <div style={styles.modalContent} onClick={(e) => e.stopPropagation()}>
+            <div style={styles.modalHeader}>
+              <h2 style={{ margin: 0, color: 'var(--accent)', fontSize: '1.25rem' }}>🎟️ Official Hostel Gate Pass</h2>
+              <button onClick={() => setSelectedGatePass(null)} style={styles.closeBtn}>✕</button>
+            </div>
+            
+            <div style={styles.modalBody}>
+              <div style={styles.approvedBadge}>
+                ✓ APPROVED BY HOSTEL SUPERINTENDENT
+              </div>
+
+              <div style={styles.qrContainer}>
+                <img
+                  src={`https://api.qrserver.com/v1/create-qr-code/?size=220x220&data=GATEPASS-${selectedGatePass.id}-${selectedGatePass.studentId}`}
+                  alt="Gate Pass QR"
+                  style={{ width: '180px', height: '180px', borderRadius: '12px', border: '2px solid var(--accent)' }}
+                />
+                <div style={{ fontSize: '0.8rem', color: 'var(--text-muted)', marginTop: '0.5rem', fontFamily: 'monospace' }}>
+                  GATEPASS-{selectedGatePass.id}-{selectedGatePass.studentId}
+                </div>
+              </div>
+
+              <div style={styles.passMeta}>
+                <div><strong>Student Name:</strong> {selectedGatePass.studentName || user.name}</div>
+                <div><strong>Student ID:</strong> #{selectedGatePass.studentId}</div>
+                <div><strong>Leave Duration:</strong> {selectedGatePass.startDate} to {selectedGatePass.endDate}</div>
+                <div><strong>Reason:</strong> {selectedGatePass.reason}</div>
+                <div><strong>Gate Verification:</strong> Scan at Security Gate</div>
+              </div>
+            </div>
+
+            <div style={styles.modalFooter}>
+              <button onClick={() => window.print()} style={styles.printBtn}>🖨️ Print Pass</button>
+              <button onClick={() => setSelectedGatePass(null)} style={styles.modalCloseBtn}>Close</button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
@@ -301,4 +355,16 @@ const styles = {
     fontWeight: 600,
   },
   empty: { color: 'var(--text-muted)', textAlign: 'center', margin: '2rem 0' },
+  gatePassBtn: { background: 'linear-gradient(135deg, #10b981 0%, #059669 100%)', color: '#fff', border: 'none', padding: '0.4rem 0.85rem', borderRadius: '6px', fontSize: '0.8rem', fontWeight: 'bold', cursor: 'pointer' },
+  modalOverlay: { position: 'fixed', top: 0, left: 0, right: 0, bottom: 0, background: 'rgba(0, 0, 0, 0.75)', display: 'flex', alignItems: 'center', justifyContent: 'center', zIndex: 1000, backdropFilter: 'blur(4px)' },
+  modalContent: { background: 'var(--surface)', border: '1px solid var(--glass-border)', borderRadius: '16px', width: '90%', maxWidth: '440px', padding: '1.5rem', boxShadow: '0 20px 40px rgba(0,0,0,0.5)' },
+  modalHeader: { display: 'flex', justifyContent: 'space-between', alignItems: 'center', borderBottom: '1px solid var(--border)', paddingBottom: '0.75rem' },
+  closeBtn: { background: 'none', border: 'none', color: 'var(--text-muted)', fontSize: '1.25rem', cursor: 'pointer' },
+  modalBody: { padding: '1.25rem 0', textAlign: 'center' },
+  approvedBadge: { background: 'rgba(34, 197, 94, 0.15)', color: '#22c55e', border: '1px solid #22c55e', padding: '0.4rem 0.85rem', borderRadius: '20px', fontWeight: 'bold', fontSize: '0.75rem', display: 'inline-block', marginBottom: '1.25rem' },
+  qrContainer: { display: 'flex', flexDirection: 'column', alignItems: 'center', marginBottom: '1.25rem' },
+  passMeta: { textAlign: 'left', background: 'var(--bg)', padding: '1rem', borderRadius: '10px', fontSize: '0.85rem', lineHeight: '1.6', border: '1px solid var(--border)' },
+  modalFooter: { display: 'flex', justifyContent: 'flex-end', gap: '0.75rem', paddingTop: '0.75rem', borderTop: '1px solid var(--border)' },
+  printBtn: { background: 'var(--accent)', color: '#000', border: 'none', padding: '0.5rem 1rem', borderRadius: '6px', fontWeight: 'bold', cursor: 'pointer' },
+  modalCloseBtn: { background: 'var(--surface-hover)', color: 'var(--text)', border: '1px solid var(--border)', padding: '0.5rem 1rem', borderRadius: '6px', cursor: 'pointer' },
 };

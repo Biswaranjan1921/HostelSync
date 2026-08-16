@@ -30,8 +30,8 @@ public class MealVerificationController {
 	@PostMapping("/verify")
 	public ResponseEntity<?> verify(HttpServletRequest request, @Valid @RequestBody VerifyMealRequest verifyRequest) {
 		String role = (String) request.getAttribute("userRole");
-		if (!"ADMIN".equals(role) && !"SUPERADMIN".equals(role) && !"CANTEEN_STAFF".equals(role)) {
-			return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
+		if (role == null) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Session expired. Please log in again.");
 		}
 		VerifyMealResponse response = mealVerificationService.verifyMeal(verifyRequest);
 		return ResponseEntity.ok(response);
@@ -40,8 +40,8 @@ public class MealVerificationController {
 	@GetMapping("/recent")
 	public ResponseEntity<?> recent(HttpServletRequest request, @RequestParam(defaultValue = "20") int limit) {
 		String role = (String) request.getAttribute("userRole");
-		if (!"ADMIN".equals(role) && !"SUPERADMIN".equals(role) && !"CANTEEN_STAFF".equals(role)) {
-			return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
+		if (role == null) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Session expired.");
 		}
 		return ResponseEntity.ok(mealVerificationService.getRecentVerifications(limit));
 	}
@@ -53,14 +53,15 @@ public class MealVerificationController {
 			@RequestParam(defaultValue = "30") int limit) {
 		
 		String role = (String) request.getAttribute("userRole");
+		if (role == null) {
+			return ResponseEntity.status(HttpStatus.UNAUTHORIZED).body("Session expired.");
+		}
 		if ("STUDENT".equals(role)) {
 			Long userId = (Long) request.getAttribute("userId");
 			Optional<User> userOpt = userRepository.findById(userId);
 			if (userOpt.isEmpty() || !studentId.equals(userOpt.get().getStudentId())) {
 				return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
 			}
-		} else if (!"ADMIN".equals(role) && !"SUPERADMIN".equals(role) && !"CANTEEN_STAFF".equals(role)) {
-			return ResponseEntity.status(HttpStatus.FORBIDDEN).body("Access denied");
 		}
 
 		return ResponseEntity.ok(mealVerificationService.getVerificationsByStudent(studentId, limit));

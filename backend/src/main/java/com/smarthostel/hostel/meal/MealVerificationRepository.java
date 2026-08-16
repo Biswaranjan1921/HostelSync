@@ -16,6 +16,8 @@ public interface MealVerificationRepository extends JpaRepository<MealVerificati
 
 	List<MealVerification> findByVerificationDateOrderByVerifiedAtDesc(LocalDate date, org.springframework.data.domain.Pageable pageable);
 
+	List<MealVerification> findByOrderByVerifiedAtDesc(org.springframework.data.domain.Pageable pageable);
+
 	long countByVerificationDateAndMealSlot(LocalDate date, MealSlot slot);
 
 	List<MealVerification> findByStudentId(Long studentId);

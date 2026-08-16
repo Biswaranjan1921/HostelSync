@@ -24,15 +24,18 @@ public class MealVerificationService {
 	private final MealVerificationRepository verificationRepository;
 	private final QrService qrService;
 	private final com.smarthostel.hostel.leave.LeaveRequestRepository leaveRequestRepository;
+	private final com.smarthostel.hostel.room.RoomRepository roomRepository;
 
 	public MealVerificationService(StudentRepository studentRepository,
 			MealVerificationRepository verificationRepository,
 			QrService qrService,
-			com.smarthostel.hostel.leave.LeaveRequestRepository leaveRequestRepository) {
+			com.smarthostel.hostel.leave.LeaveRequestRepository leaveRequestRepository,
+			com.smarthostel.hostel.room.RoomRepository roomRepository) {
 		this.studentRepository = studentRepository;
 		this.verificationRepository = verificationRepository;
 		this.qrService = qrService;
 		this.leaveRequestRepository = leaveRequestRepository;
+		this.roomRepository = roomRepository;
 	}
 
 	@Transactional
@@ -65,38 +68,53 @@ public class MealVerificationService {
 			return VerifyMealResponse.fail("FORMAL REJECTION NOTICE: Student account (ID: #" + student.getId() + ") is inactive. Dining access denied.");
 		}
 
-		// Dynamically compute meal slot from current server time
-		java.time.LocalTime now = java.time.LocalTime.now(java.time.ZoneId.systemDefault());
-		MealSlot computedSlot = null;
-
-		// Breakfast: 9:00 AM to 11:00 AM
-		if (!now.isBefore(java.time.LocalTime.of(9, 0)) && !now.isAfter(java.time.LocalTime.of(11, 0))) {
-			computedSlot = MealSlot.BREAKFAST;
-		}
-		// Lunch: 12:30 PM to 2:30 PM
-		else if (!now.isBefore(java.time.LocalTime.of(12, 30)) && !now.isAfter(java.time.LocalTime.of(14, 30))) {
-			computedSlot = MealSlot.LUNCH;
-		}
-		// Dinner: 7:30 PM to 9:30 PM
-		else if (!now.isBefore(java.time.LocalTime.of(19, 30)) && !now.isAfter(java.time.LocalTime.of(21, 30))) {
-			computedSlot = MealSlot.DINNER;
-		}
+		// Dynamically compute meal slot based on explicit request override or exact/nearest time window in IST (Asia/Kolkata)
+		java.time.ZoneId hostelZone = java.time.ZoneId.of("Asia/Kolkata");
+		java.time.LocalTime now = java.time.LocalTime.now(hostelZone);
+		LocalDate today = LocalDate.now(hostelZone);
+		MealSlot computedSlot = request.getMealSlot();
 
 		if (computedSlot == null) {
-			return VerifyMealResponse.fail("FORMAL REJECTION NOTICE: Meal scanning is currently closed. Active dining windows: Breakfast (9-11 AM), Lunch (12:30-2:30 PM), Dinner (7:30-9:30 PM). Verification denied.");
+			// Cross-Midnight Late Night Dinner Shift (00:00 AM to 02:30 AM)
+			if (now.isBefore(java.time.LocalTime.of(2, 30))) {
+				computedSlot = MealSlot.DINNER;
+				today = today.minusDays(1); // Belongs to previous day's operational dinner shift
+			}
+			// Breakfast: 8:00 AM (08:00) to 10:00 AM (10:00)
+			else if (!now.isBefore(java.time.LocalTime.of(8, 0)) && !now.isAfter(java.time.LocalTime.of(10, 0))) {
+				computedSlot = MealSlot.BREAKFAST;
+			}
+			// Lunch: 11:30 AM (11:30) to 2:00 PM (14:00)
+			else if (!now.isBefore(java.time.LocalTime.of(11, 30)) && !now.isAfter(java.time.LocalTime.of(14, 0))) {
+				computedSlot = MealSlot.LUNCH;
+			}
+			// Dinner: 8:00 PM (20:00) to 10:00 PM (22:00)
+			else if (!now.isBefore(java.time.LocalTime.of(20, 0)) && !now.isAfter(java.time.LocalTime.of(22, 0))) {
+				computedSlot = MealSlot.DINNER;
+			}
+			// Seamless window fallback for off-peak testing (e.g. evening 7pm -> Dinner)
+			else if (!now.isBefore(java.time.LocalTime.of(16, 30))) {
+				computedSlot = MealSlot.DINNER;
+			} else if (!now.isBefore(java.time.LocalTime.of(10, 30))) {
+				computedSlot = MealSlot.LUNCH;
+			} else {
+				computedSlot = MealSlot.BREAKFAST;
+			}
 		}
 
-		LocalDate today = LocalDate.now(ZoneId.systemDefault());
-
-		// Check if student is on leave today
+		// Check if student is on approved leave today
 		if (leaveRequestRepository.countActiveLeaves(student.getId(), today) > 0) {
-			return VerifyMealResponse.fail("FORMAL REJECTION NOTICE: Student (ID: #" + student.getId() + ") is on approved leave today. Dining access is suspended. Verification denied.");
+			return VerifyMealResponse.fail("FORMAL REJECTION NOTICE: Student " + student.getName() + " (ID: #" + student.getId() + ") is on approved leave today. Dining access is suspended.");
 		}
 
+		// Strict Once-Per-Slot Verification Check
 		Optional<MealVerification> existing = verificationRepository
 				.findByStudentIdAndMealSlotAndVerificationDate(student.getId(), computedSlot, today);
 		if (existing.isPresent()) {
-			return VerifyMealResponse.fail("FORMAL REJECTION NOTICE: Meal access has already been verified for " + computedSlot + " today. Duplicate scan attempt rejected.");
+			String verifiedTimeStr = java.time.format.DateTimeFormatter.ofPattern("hh:mm:ss a")
+					.withZone(hostelZone)
+					.format(existing.get().getVerifiedAt());
+			return VerifyMealResponse.fail("FORMAL REJECTION NOTICE: Meal pass for " + student.getName() + " (Token: " + student.getQrToken() + ") HAS ALREADY BEEN VERIFIED for " + computedSlot + " today at " + verifiedTimeStr + ". This meal has already been taken and cannot be scanned again.");
 		}
 
 		MealVerification verification = new MealVerification();
@@ -104,20 +122,31 @@ public class MealVerificationService {
 		verification.setMealSlot(computedSlot);
 		verification.setVerificationDate(today);
 		verification.setVerifiedAt(Instant.now());
-		verificationRepository.save(verification);
 
-		return VerifyMealResponse.ok(
+		try {
+			verificationRepository.save(verification);
+		} catch (org.springframework.dao.DataIntegrityViolationException dive) {
+			return VerifyMealResponse.fail("FORMAL REJECTION NOTICE: Concurrent scan detected. Meal pass for " + student.getName() + " HAS ALREADY BEEN VERIFIED for " + computedSlot + " today.");
+		}
+
+		String formatTime = java.time.format.DateTimeFormatter.ofPattern("hh:mm:ss a")
+				.withZone(hostelZone)
+				.format(verification.getVerifiedAt());
+
+		VerifyMealResponse response = VerifyMealResponse.ok(
 				student.getId(),
 				student.getName(),
 				computedSlot,
 				today,
 				verification.getVerifiedAt()
 		);
+		response.setMessage("MEAL VERIFIED SUCCESSFULLY! Student: " + student.getName() + " | Token: " + student.getQrToken() + " | Meal: " + computedSlot + " | Time: " + formatTime);
+		return response;
 	}
 
 	public List<java.util.Map<String, Object>> getRecentVerifications(int limit) {
 		List<MealVerification> list = verificationRepository
-				.findByVerificationDateOrderByVerifiedAtDesc(LocalDate.now(), PageRequest.of(0, limit));
+				.findByOrderByVerifiedAtDesc(PageRequest.of(0, limit));
 		
 		return list.stream().map(m -> {
 			java.util.Map<String, Object> map = new java.util.HashMap<>();
@@ -129,6 +158,16 @@ public class MealVerificationService {
 			
 			studentRepository.findById(m.getStudentId()).ifPresent(s -> {
 				map.put("studentName", s.getName());
+				map.put("department", s.getDepartment());
+				map.put("phone", s.getPhone());
+				if (s.getPhotoBase64() != null) {
+					map.put("photoBase64", s.getPhotoBase64());
+				}
+				if (s.getRoomId() != null) {
+					roomRepository.findById(s.getRoomId()).ifPresent(r -> {
+						map.put("roomNumber", r.getNumber());
+					});
+				}
 			});
 			return map;
 		}).collect(java.util.stream.Collectors.toList());

@@ -33,15 +33,52 @@ export default function CanteenDashboard() {
     }
   };
 
+  const playPhonePeChime = () => {
+    try {
+      const AudioCtx = window.AudioContext || window.webkitAudioContext;
+      if (!AudioCtx) return;
+      const ctx = new AudioCtx();
+      const osc = ctx.createOscillator();
+      const gain = ctx.createGain();
+      osc.type = 'sine';
+      osc.frequency.setValueAtTime(880, ctx.currentTime);
+      osc.frequency.exponentialRampToValueAtTime(1760, ctx.currentTime + 0.12);
+      gain.gain.setValueAtTime(0.35, ctx.currentTime);
+      gain.gain.exponentialRampToValueAtTime(0.01, ctx.currentTime + 0.15);
+      osc.connect(gain);
+      gain.connect(ctx.destination);
+      osc.start();
+      osc.stop(ctx.currentTime + 0.15);
+    } catch (e) {}
+  };
+
+  const [selectedMealSlot, setSelectedMealSlot] = useState('AUTO');
+
   const handleScan = async (decodedText) => {
     if (!decodedText || !decodedText.trim()) return;
     try {
       setScanning(true);
-      const res = await api.mealVerification.verify({ qrPayload: decodedText.trim() });
+      const payload = { qrPayload: decodedText.trim() };
+      if (selectedMealSlot !== 'AUTO') {
+        payload.mealSlot = selectedMealSlot;
+      }
+      const res = await api.mealVerification.verify(payload);
+      playPhonePeChime();
       setScanResult({
         success: true,
         data: res
       });
+      if (res && res.studentId) {
+        const newScanObj = {
+          id: Date.now(),
+          studentId: res.studentId,
+          studentName: res.studentName,
+          mealSlot: res.mealSlot,
+          verifiedAt: res.verifiedAt || new Date().toISOString(),
+          verificationDate: res.date || new Date().toISOString().split('T')[0]
+        };
+        setRecentScans((prev) => [newScanObj, ...prev.filter(x => x.studentId !== res.studentId || x.mealSlot !== res.mealSlot)]);
+      }
       loadRecentScans();
     } catch (err) {
       const errMsg = err.message || 'Verification rejected by server.';
@@ -64,42 +101,60 @@ export default function CanteenDashboard() {
   const startCamera = async () => {
     try {
       setScanResult(null);
-      // Ask user for explicit camera permission
-      await navigator.mediaDevices.getUserMedia({ video: true });
-
-      const cameras = await Html5Qrcode.getCameras();
-      if (!cameras || cameras.length === 0) {
-        setScanResult({
-          success: false,
-          isFormalDenial: true,
-          message: 'FORMAL DENIAL NOTICE: No camera hardware detected on this device. Please upload a QR image or use manual input.'
-        });
-        return;
-      }
-
+      
       if (qrInstanceRef.current) {
         await qrInstanceRef.current.stop().catch(() => {});
         qrInstanceRef.current = null;
       }
 
-      const html5Qr = new Html5Qrcode('qr-reader');
+      const html5Qr = new Html5Qrcode('qr-reader', {
+        verbose: false,
+        experimentalFeatures: {
+          useBarCodeDetectorIfSupported: true
+        }
+      });
       qrInstanceRef.current = html5Qr;
 
-      const cameraId = cameras[0].id;
-      await html5Qr.start(
-        cameraId,
-        { fps: 10, qrbox: { width: 220, height: 220 } },
-        (decodedText) => {
-          handleScan(decodedText);
-        },
-        () => {}
-      );
+      const qrConfig = {
+        fps: 30,
+        qrbox: (viewfinderWidth, viewfinderHeight) => ({
+          width: Math.min(viewfinderWidth * 0.85, 280),
+          height: Math.min(viewfinderHeight * 0.85, 280)
+        }),
+        aspectRatio: 1.0
+      };
+
+      // Try environment camera first, fallback to default camera
+      try {
+        await html5Qr.start(
+          { facingMode: 'environment' },
+          qrConfig,
+          (decodedText) => {
+            handleScan(decodedText);
+          },
+          () => {}
+        );
+      } catch (e) {
+        const cameras = await Html5Qrcode.getCameras();
+        if (cameras && cameras.length > 0) {
+          await html5Qr.start(
+            cameras[0].id,
+            qrConfig,
+            (decodedText) => {
+              handleScan(decodedText);
+            },
+            () => {}
+          );
+        } else {
+          throw new Error('No camera hardware detected on this device.');
+        }
+      }
       setCameraActive(true);
     } catch (err) {
       setScanResult({
         success: false,
         isFormalDenial: true,
-        message: 'FORMAL DENIAL NOTICE: Camera access permission denied by user or device settings.'
+        message: `FORMAL DENIAL NOTICE: Camera error: ${err.message || 'Access denied by browser/device settings'}.`
       });
       setCameraActive(false);
     }
@@ -187,6 +242,30 @@ export default function CanteenDashboard() {
         <div style={styles.scannerCard} className="glass-card">
           <h3 style={styles.cardHeader}><QrCode size={20} color="var(--accent)" /> Scanner Terminal</h3>
           
+          {/* Meal Slot Mode Selector */}
+          <div style={{ display: 'flex', alignItems: 'center', justifyContent: 'space-between', gap: '0.75rem', marginBottom: '1rem', background: 'rgba(255, 255, 255, 0.04)', padding: '0.75rem 1rem', borderRadius: '10px', border: '1px solid var(--border)' }}>
+            <span style={{ fontSize: '0.85rem', fontWeight: 700, color: 'var(--text-muted)' }}>Meal Slot Mode:</span>
+            <select
+              value={selectedMealSlot}
+              onChange={(e) => setSelectedMealSlot(e.target.value)}
+              style={{
+                background: 'var(--bg)',
+                color: 'var(--text)',
+                border: '1px solid var(--accent)',
+                padding: '0.4rem 0.8rem',
+                borderRadius: '6px',
+                fontSize: '0.85rem',
+                fontWeight: 600,
+                cursor: 'pointer'
+              }}
+            >
+              <option value="AUTO">⚡ Auto-Detect Time Window</option>
+              <option value="BREAKFAST">🌅 Breakfast (8:00 AM - 10:00 AM)</option>
+              <option value="LUNCH">☀️ Lunch (11:30 AM - 2:00 PM)</option>
+              <option value="DINNER">🌙 Dinner (8:00 PM - 10:00 PM)</option>
+            </select>
+          </div>
+
           {/* Camera Permission Button */}
           <div style={{ marginBottom: '1rem', textAlign: 'center' }}>
             {!cameraActive ? (
@@ -200,7 +279,20 @@ export default function CanteenDashboard() {
             )}
           </div>
 
-          <div id="qr-reader" style={styles.reader}></div>
+          <div style={{ position: 'relative', overflow: 'hidden', borderRadius: '12px' }}>
+            <div id="qr-reader" style={styles.reader}></div>
+            {cameraActive && (
+              <div style={styles.phonePeScannerOverlay}>
+                <div style={styles.phonePeReticleBox}>
+                  <div style={styles.phonePeLaserBeam}></div>
+                  <div style={styles.phonePeCornerTL}></div>
+                  <div style={styles.phonePeCornerTR}></div>
+                  <div style={styles.phonePeCornerBL}></div>
+                  <div style={styles.phonePeCornerBR}></div>
+                </div>
+              </div>
+            )}
+          </div>
 
           {/* Upload QR Image Button */}
           <div style={{ marginTop: '1.25rem' }}>
@@ -234,13 +326,15 @@ export default function CanteenDashboard() {
           {/* Access Granted Box */}
           {scanResult && scanResult.success && (
             <div style={styles.successBox}>
-              <CheckCircle2 size={36} color="#22c55e" />
+              <CheckCircle2 size={36} color="#22c55e" style={{ flexShrink: 0 }} />
               <div>
-                <h3 style={{ margin: '0 0 0.25rem 0', color: '#22c55e' }}>Access Granted</h3>
-                <p style={{ margin: 0, fontSize: '0.95rem' }}>
+                <h3 style={{ margin: '0 0 0.25rem 0', color: '#22c55e', fontSize: '1.05rem', fontWeight: 800 }}>
+                  Access Granted ✓
+                </h3>
+                <p style={{ margin: 0, fontSize: '0.9rem', lineHeight: '1.5', color: 'var(--text)' }}>
                   <strong>{scanResult.data.studentName}</strong> (ID: {scanResult.data.studentId})<br/>
-                  <span style={{ color: 'var(--text-muted)', fontSize: '0.85rem' }}>
-                    Meal Slot: {scanResult.data.mealSlot} • {new Date(scanResult.data.verifiedAt).toLocaleTimeString()}
+                  <span style={{ color: 'var(--accent)', fontWeight: 600, fontSize: '0.85rem' }}>
+                    Meal Slot: {scanResult.data.mealSlot} • Time: {new Date(scanResult.data.verifiedAt || Date.now()).toLocaleTimeString([], { hour: '2-digit', minute: '2-digit', second: '2-digit' })}
                   </span>
                 </p>
               </div>
@@ -338,4 +432,38 @@ const styles = {
   td: { padding: '0.85rem 1rem' },
   subText: { fontSize: '0.75rem', color: 'var(--text-muted)', display: 'block' },
   slotBadge: { background: 'rgba(59, 130, 246, 0.15)', color: 'var(--accent)', padding: '2px 8px', borderRadius: '4px', fontSize: '0.75rem', fontWeight: 'bold' },
+  phonePeScannerOverlay: {
+    position: 'absolute',
+    top: 0,
+    left: 0,
+    right: 0,
+    bottom: 0,
+    pointerEvents: 'none',
+    display: 'flex',
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  phonePeReticleBox: {
+    position: 'relative',
+    width: '80%',
+    height: '80%',
+    maxWidth: '280px',
+    maxHeight: '280px',
+    border: '2px dashed rgba(164, 184, 133, 0.4)',
+    borderRadius: '16px',
+    boxShadow: '0 0 0 9999px rgba(0, 0, 0, 0.4)',
+  },
+  phonePeLaserBeam: {
+    position: 'absolute',
+    width: '100%',
+    height: '3px',
+    background: 'linear-gradient(90deg, transparent 0%, #A4B885 50%, transparent 100%)',
+    boxShadow: '0 0 12px #A4B885',
+    top: '10%',
+    animation: 'phonePeLaser 2s infinite ease-in-out',
+  },
+  phonePeCornerTL: { position: 'absolute', top: -2, left: -2, width: 24, height: 24, borderTop: '4px solid #A4B885', borderLeft: '4px solid #A4B885', borderTopLeftRadius: '12px' },
+  phonePeCornerTR: { position: 'absolute', top: -2, right: -2, width: 24, height: 24, borderTop: '4px solid #A4B885', borderRight: '4px solid #A4B885', borderTopRightRadius: '12px' },
+  phonePeCornerBL: { position: 'absolute', bottom: -2, left: -2, width: 24, height: 24, borderBottom: '4px solid #A4B885', borderLeft: '4px solid #A4B885', borderBottomLeftRadius: '12px' },
+  phonePeCornerBR: { position: 'absolute', bottom: -2, right: -2, width: 24, height: 24, borderBottom: '4px solid #A4B885', borderRight: '4px solid #A4B885', borderBottomRightRadius: '12px' },
 };

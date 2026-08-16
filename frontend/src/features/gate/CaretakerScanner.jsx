@@ -28,27 +28,55 @@ export default function CaretakerScanner() {
 
   const handleScan = async (qrPayload) => {
     if (!qrPayload || !qrPayload.trim()) {
-      setResult({ success: false, message: 'Scan or type student daily QR code payload' });
+      setResult({ success: false, message: 'Scan or type student QR pass payload' });
       return;
     }
     setLoading(true);
     setResult(null);
     try {
-      const res = await api.attendance.record({
-        qrPayload: qrPayload.trim(),
-        direction: direction
-      });
-      setResult({
-        success: true,
-        message: `${direction === 'ENTRY' ? 'Check-In' : 'Check-Out'} logged successfully.`,
-        studentName: res.studentName
-      });
+      const cleanPayload = qrPayload.trim();
+      if (cleanPayload.startsWith('GATEPASS-')) {
+        const passRes = await api.leaves.verifyGatePass({ qrPayload: cleanPayload });
+        if (passRes.success) {
+          setResult({
+            success: true,
+            isGatePass: true,
+            message: passRes.message,
+            studentName: passRes.studentName,
+            studentId: passRes.studentId,
+            department: passRes.department,
+            roomNumber: passRes.roomNumber,
+            reason: passRes.reason,
+            startDate: passRes.startDate,
+            endDate: passRes.endDate,
+            photoBase64: passRes.photoBase64,
+          });
+        } else {
+          setResult({
+            success: false,
+            isFormalDenial: true,
+            message: passRes.message
+          });
+        }
+      } else {
+        const res = await api.attendance.record({
+          qrPayload: cleanPayload,
+          direction: direction
+        });
+        setResult({
+          success: true,
+          message: `${direction === 'ENTRY' ? 'Check-In' : 'Check-Out'} logged successfully.`,
+          studentName: res.studentName
+        });
+      }
       setManualPayload('');
       loadRecentLogs();
     } catch (err) {
+      const errMsg = err.body?.message || err.message || 'Gate log verification failed.';
       setResult({
         success: false,
-        message: err.body?.message || err.message || 'Gate log verification failed.'
+        isFormalDenial: errMsg.startsWith('FORMAL DENIAL'),
+        message: errMsg
       });
     } finally {
       setLoading(false);
@@ -62,29 +90,45 @@ export default function CaretakerScanner() {
 
   useEffect(() => {
     if (scanMode !== 'camera') return;
-    const startCamera = () => {
-      Html5Qrcode.getCameras()
-        .then((cameras) => {
-          if (cameras.length === 0) {
+    const startCamera = async () => {
+      try {
+        const html5Qr = new Html5Qrcode('gate-qr-reader', {
+          verbose: false,
+          experimentalFeatures: { useBarCodeDetectorIfSupported: true }
+        });
+        scannerRef.current = html5Qr;
+
+        const qrConfig = {
+          fps: 30,
+          qrbox: (w, h) => ({ width: Math.min(w * 0.85, 280), height: Math.min(h * 0.85, 280) }),
+          aspectRatio: 1.0
+        };
+
+        const onScanSuccess = (decodedText) => {
+          html5Qr.stop().then(() => {
+            setScanMode('manual');
+            setCameraReady(false);
+            scannerRef.current = null;
+            document.getElementById('gate-qr-reader')?.replaceChildren?.();
+            handleScan(decodedText);
+          }).catch(() => {});
+        };
+
+        try {
+          await html5Qr.start({ facingMode: 'environment' }, qrConfig, onScanSuccess, () => {});
+          setCameraReady(true);
+        } catch (e) {
+          const cameras = await Html5Qrcode.getCameras();
+          if (cameras && cameras.length > 0) {
+            await html5Qr.start(cameras[0].id, qrConfig, onScanSuccess, () => {});
+            setCameraReady(true);
+          } else {
             setResult({ success: false, message: 'No camera hardware found.' });
-            return;
           }
-          const id = cameras[0].id;
-          const html5Qr = new Html5Qrcode('gate-qr-reader');
-          scannerRef.current = html5Qr;
-          html5Qr.start(id, { fps: 5, qrbox: { width: 250, height: 250 } },
-            (decodedText) => {
-              html5Qr.stop().then(() => {
-                setScanMode('manual');
-                setCameraReady(false);
-                scannerRef.current = null;
-                document.getElementById('gate-qr-reader')?.replaceChildren?.();
-                handleScan(decodedText);
-              }).catch(() => {});
-            }, () => {}
-          ).then(() => setCameraReady(true)).catch((err) => setResult({ success: false, message: 'Camera error: ' + (err.message || 'Unknown') }));
-        })
-        .catch(() => setResult({ success: false, message: 'Could not access cameras.' }));
+        }
+      } catch (err) {
+        setResult({ success: false, message: 'Camera error: ' + (err.message || 'Unknown') });
+      }
     };
     startCamera();
     return () => {
