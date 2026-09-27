@@ -1,4 +1,5 @@
-const API = '/api';
+const API_BASE = import.meta.env.VITE_API_BASE_URL ? import.meta.env.VITE_API_BASE_URL.replace(/\/$/, '') : '';
+const API = API_BASE ? `${API_BASE}/api` : '/api';
 
 function getErrorMessage(err) {
   const b = err.body;
